@@ -2,7 +2,7 @@ import telebot
 import time
 
 # GANTI DENGAN TOKEN BOT ANDA
-BOT_TOKEN = '8141275674:AAEq1WodTyoi_D54hF5dsOs_xFps40zc8xc'
+BOT_TOKEN = '7343856291:AAHWR8oPdtmI_yc4u6OCOHugz_5rPVd7oAU'
 bot = telebot.TeleBot(BOT_TOKEN)
 
 @bot.message_handler(commands=['start', 'hello'])
