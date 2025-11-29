@@ -180,7 +180,7 @@ def check_inbox(message):
         email = data.get('email')
         password = data.get('password')
     except Exception:
-        bot.send_message(user_id, "<b>❌ Error: Data email tidak valid. Cobafrom flask import Flask
+        bot.send_message(user_id, "<b>❌ Error: Data email tidak valid. Cobafrom flask import Flask </b>")
 from threading import Thread
 import telebot
 import requests
