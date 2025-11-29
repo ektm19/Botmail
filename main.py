@@ -5,6 +5,7 @@ import os
 import random
 import string
 import time
+# PENTING: Pastikan Anda hanya menginstal: pip install pyTelegramBotAPI requests
 
 # --- 1. KONFIGURASI DAN INISIALISASI ---
 
@@ -13,15 +14,19 @@ BOT_TOKEN = '7343856291:AAHWR8oPdtmI_yc4u6OCOHugz_5rPVd7oAU'
 bot = telebot.TeleBot(BOT_TOKEN)
 
 MAILTM_API_BASE = "https://api.mail.tm"
-# File penyimpanan data email (Ganti dengan path sesuai kebutuhan Anda)
-# Kami akan menyimpan data email per user di sini untuk kesederhanaan
+# File penyimpanan data email
 USER_DATA_FILE = "user_mail_data.json" 
 
 # Memuat data email yang disimpan (jika ada)
-if os.path.exists(USER_DATA_FILE):
-    with open(USER_DATA_FILE, 'r') as f:
-        USER_MAIL_DATA = json.load(f)
-else:
+try:
+    if os.path.exists(USER_DATA_FILE):
+        with open(USER_DATA_FILE, 'r') as f:
+            USER_MAIL_DATA = json.load(f)
+    else:
+        USER_MAIL_DATA = {}
+except Exception:
+    # Handle corrupted file
+    print("Warning: Failed to load user data file. Starting with empty data.")
     USER_MAIL_DATA = {}
 
 def save_data():
@@ -39,7 +44,6 @@ def get_random_string(length):
 def get_available_domain():
     """Mengambil domain pertama yang tersedia dari Mail.tm."""
     try:
-        # Menambahkan timeout untuk keandalan
         response = requests.get(f"{MAILTM_API_BASE}/domains", timeout=10) 
         response.raise_for_status() 
         domains = response.json().get('hydra:member', [])
@@ -78,7 +82,7 @@ def generate_email(message):
         return
 
     username = get_random_string(10)
-    password = get_random_string(12) # Password diperlukan untuk login cek inbox
+    password = get_random_string(12) 
     email_address = f"{username}@{domain}"
     
     payload = {"address": email_address, "password": password}
@@ -89,19 +93,22 @@ def generate_email(message):
         
         account_data = response.json()
         
-        # Simpan data di memori (dan ke file)
         USER_MAIL_DATA[user_id] = {
             "email": email_address,
             "id": account_data.get('id'),
             "password": password
         }
-        save_data() # Simpan data setelah update
+        save_data()
             
-        bot.send_message(user_id, f"<b>✅ Email Sementara Berhasil Dibuat!</b>\n\n📧 <b>Alamat: </b><code>{email_address}</code>\n\n*Alamat ini valid untuk 1 jam atau lebih.", parse_mode='HTML')
+        bot.send_message(user_id, f"<b>✅ Email Sementara Berhasil Dibuat!</b>\n\n📧 <b>Alamat: </b><code>{email_address}</code>", parse_mode='HTML')
         
     except requests.exceptions.RequestException as e:
-        error_msg = response.json().get('detail', 'Gagal membuat email.') if 'response' in locals() else 'Gagal koneksi ke API.'
-        bot.send_message(user_id, f"<b>❌ Error: {error_msg}</b>", parse_mode='HTML')
+        error_msg = 'Gagal koneksi ke API.'
+        try:
+            error_msg = response.json().get('detail', f"HTTP {response.status_code}")
+        except:
+             pass
+        bot.send_message(user_id, f"<b>❌ Error membuat email:\n{error_msg}</b>", parse_mode='HTML')
 
 
 @bot.message_handler(func=lambda message: message.text == '🚀 Email Saya')
@@ -131,16 +138,17 @@ def check_inbox(message):
     login_payload = {"address": email, "password": password}
     
     try:
-        # 1. Login untuk mendapatkan Token
+        # --- LANGKAH 1: DAPATKAN TOKEN ---
         login_response = requests.post(f"{MAILTM_API_BASE}/token", json=login_payload, timeout=10)
-        login_response.raise_for_status()
+        login_response.raise_for_status() 
         token = login_response.json().get('token')
         
         if not token:
-            bot.send_message(user_id, "<b>❌ Gagal mendapatkan token login (Mail.tm).</b>", parse_mode='HTML')
+            detail = login_response.json().get('detail', 'Token tidak ditemukan dalam respons.')
+            bot.send_message(user_id, f"<b>❌ Gagal Login ke Mail.tm:</b> {detail}", parse_mode='HTML')
             return
         
-        # 2. Ambil Email (Messages) menggunakan Token
+        # --- LANGKAH 2: AMBIL PESAN ---
         headers = {"Authorization": f"Bearer {token}"}
         messages_response = requests.get(f"{MAILTM_API_BASE}/messages", headers=headers, timeout=10)
         messages_response.raise_for_status()
@@ -153,7 +161,7 @@ def check_inbox(message):
             bot.send_message(user_id, f"<b>✅ Ditemukan {len(emails)} pesan baru.</b>", parse_mode='HTML')
             
             for msg_data in emails:
-                # 3. Ambil detail pesan
+                # --- LANGKAH 3: AMBIL DETAIL PESAN ---
                 detail_response = requests.get(f"{MAILTM_API_BASE}/messages/{msg_data['id']}", headers=headers, timeout=10)
                 detail_response.raise_for_status()
                 detail = detail_response.json()
@@ -165,14 +173,24 @@ def check_inbox(message):
                 msg += f"<b>📑 Subjek:</b> {detail.get('subject', 'N/A')}\n\n"
                 
                 preview = body_text.strip()
-                # Batasi preview konten
                 msg += f"<b>📝 Preview:</b>\n{preview[:300]}{'...' if len(preview) > 300 else ''}"
 
                 bot.send_message(user_id, msg, parse_mode='HTML')
                 
+    except requests.exceptions.HTTPError as e:
+        # Penanganan error spesifik dari API (401, 404, 500)
+        status_code = e.response.status_code
+        error_detail = "Terjadi kesalahan HTTP yang tidak diketahui."
+        try:
+            error_detail = e.response.json().get('detail', f"Status {status_code}")
+        except:
+            error_detail = f"Status {status_code}"
+            
+        bot.send_message(user_id, f"<b>❌ Gagal Cek Inbox (HTTP Error {status_code}):</b> {error_detail}", parse_mode='HTML')
     except requests.exceptions.RequestException as e:
-        print(f"Error checking Mail.tm inbox: {e}")
-        bot.send_message(user_id, "<b>❌ Terjadi Kesalahan saat memeriksa inbox.</b>", parse_mode='HTML')
+        # Penanganan error koneksi atau timeout
+        print(f"Connection Error during Mail.tm operation: {e}")
+        bot.send_message(user_id, "<b>❌ Terjadi Kesalahan Koneksi saat memeriksa inbox.</b>", parse_mode='HTML')
 
 
 # --- 4. START POLLING BOT ---
@@ -184,6 +202,5 @@ if __name__ == '__main__':
         try:
             bot.polling(none_stop=True, interval=0, timeout=30)
         except Exception as e:
-            # Jeda sebentar sebelum mencoba lagi setelah error (misalnya koneksi terputus)
             print(f"Bot Polling Error: {e}. Mencoba lagi dalam 15 detik.")
             time.sleep(15)
