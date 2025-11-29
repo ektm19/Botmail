@@ -8,10 +8,10 @@ from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 # --- KONFIGURASI DAN INICIALISASI ---
 
 # Ganti dengan Token Bot Anda
-BOT_TOKEN = "8271421272:AAHDcwdsveSmwKVXvqAHn4VpdKSpXH37cG4" 
+BOT_TOKEN = "5391771268:AAEhgFIWqPRD16fQ2fkmgI8FBH2dYwLaFe4" 
 MAIL_TM_API = "https://api.mail.tm"
 user_sessions = {}
-ADMIN_IDS = [123456789] 
+ADMIN_IDS = [1188483395] 
 # 🗑️ REQUIRED_CHANNEL DIHAPUS
 
 # Inisialisasi Aplikasi Flask dan Telegram Bot
