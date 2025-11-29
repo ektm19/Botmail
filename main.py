@@ -362,4 +362,4 @@ def check_inbox(message):
         email = data.get('email')
         password = data.get('password')
     except Exception:
-        bot.send_message(user_id, "<b>❌ Error: Data email tidak valid. Coba
+        bot.send_message(user_id, "<b>❌ Error: Data email tidak valid. Coba </b>", parse_mode='HTML')
